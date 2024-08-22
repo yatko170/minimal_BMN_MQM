@@ -154,11 +154,14 @@ class BNAF(tfb.Bijector):
 
 
 class BNAFDensityEstimator():
-    """Density estimator with BNAF."""
+    """Density estimator with BNAF using a multivariate Student's t-distribution."""
 
     def __init__(self, dims, w=None):
         self.dim = dims[0]
         self.flow = BNAF(dims, w=w)
+        self.df = 22 # degrees of freedom
+        self.loc = 0  # location
+        self.scale = 1  # scale
 
     @property
     def trainable_variables(self):
@@ -166,26 +169,33 @@ class BNAFDensityEstimator():
 
     def log_prob(self, x):
         assert int(x.shape[-1]) == self.dim, "incompatible input shape"
-        base = tfd.Independent(tfd.Normal(loc=[0]*self.dim, scale=[1]*self.dim), reinterpreted_batch_ndims=1)
+        base = tfd.Independent(tfd.StudentT(df=self.df, loc=[self.loc]*self.dim, scale=[self.scale]*self.dim), reinterpreted_batch_ndims=1)
         y, logdet = self.flow.forward(x)
         return base.log_prob(y) + logdet
 
 
 class BNAFSampler():
-    """Sampler with BNAF."""
+    """Sampler with BNAF using a multivariate Student's t-distribution."""
 
     def __init__(self, dims):
         self.dim = dims[0]
         self.flow = BNAF(dims)
+        self.df = 22  # degrees of freedom
+        self.loc = 0  # location
+        self.scale = 1  # scale
 
     @property
     def trainable_variables(self):
         return self.flow.trainable_variables
 
     def sample(self, batch_size):
-        base = tfd.Independent(tfd.Normal(loc=[0]*self.dim, scale=[1]*self.dim), reinterpreted_batch_ndims=1)
+        base = tfd.Independent(tfd.StudentT(df=self.df, loc=[self.loc]*self.dim, scale=[self.scale]*self.dim), reinterpreted_batch_ndims=1)
         x = base.sample(batch_size)
         y, logdet = self.flow.forward(x)
         # return both the samples and their log probs
         return y, base.log_prob(x) - logdet
+
+
+
+
 
